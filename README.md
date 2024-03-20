@@ -124,4 +124,4 @@ This repository includes a GitHub Actions workflow configured to deploy to diffe
 **AWS_ACCESS_KEY_ID**: AWS Access Key ID for deployment.
 **AWS_SECRET_ACCESS_KEY**: AWS Secret Access Key for deployment.
 
-<img width="1434" alt="image" src="https://github.com/marcelinhov2/supavisor-ecs/assets/232648/3f3d9e59-e467-4436-98f2-a0fce4013290">
+<img width="1434" alt="image" src="https://github.com/marcelinhov2/supavisor-ecs/assets/232648/1a83c90d-c6dc-4e67-babd-062499857d43">
