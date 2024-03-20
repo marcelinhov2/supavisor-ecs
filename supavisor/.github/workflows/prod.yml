@@ -1,0 +1,53 @@
+name: Publish upgrade artifacts to production
+
+on:
+  push:
+    branches:
+      - release
+env:
+  INCLUDE_ERTS: true
+  MIX_ENV: prod
+jobs:
+  publish:
+    runs-on: u22-arm-runner
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+      id-token: write    
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Elixir
+        run: |
+            . ~/.asdf/asdf.sh
+            echo 'elixir v1.14.5-otp-25' >> ~/.tool-versions
+            echo 'erlang 25.3.2.7' >> ~/.tool-versions
+            elixir -v
+      - name: Set up Rust
+        uses: ATiltedTree/setup-rust@v1
+        with:
+          rust-version: stable
+      - name: Cache Mix
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+      - name: Install dependencies
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+      - name: Make release
+        run: mix release supavisor
+      - name: Create tarball
+        run: cd _build/prod/rel/ && tar -czvf ${{ secrets.TARBALL_REGIONS_PROD }}_supavisor_v$(cat ../../../VERSION)_$(date "+%s").tar.gz supavisor
+      - name: configure aws credentials - production
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PROD_AWS_ROLE }}
+          aws-region: "us-east-1"
+      - name: Deploy to S3
+        shell: bash
+        run: aws s3 sync ./_build/prod/rel/ ${{ secrets.TARBALLS_PATH_PROD }} --exclude '*' --include '*tar.gz'

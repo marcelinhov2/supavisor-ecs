@@ -1,0 +1,11 @@
+*.js
+!lib/lambda/index.js
+!jest.config.js
+!.eslintrc.js
+!.prettierrc.js
+*.d.ts
+node_modules
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out

@@ -1,0 +1,81 @@
+name: Deploy and Test Serverless Elixir ECS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: Environment Variable
+        required: false
+        options: 
+          - development
+          - staging
+          - production
+        default: "development"
+  push:
+    branches:
+      - dev
+      - main
+env:
+  ORG_AWS_DEFAULT_REGION: us-east-1
+  AWS_DEFAULT_REGION: us-east-1
+  CI: false 
+  
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      deployEnv: ${{ steps.setup_env.outputs.deployEnv }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+      - name: Setup environment
+        id: setup_env
+        run: |
+          deployEnv="${{ github.event.inputs.environment }}"
+          if [ "${GITHUB_REF#refs/heads/}" == "dev" ]; then
+            deployEnv="development"
+          fi
+          if [ "${GITHUB_REF#refs/heads/}" == "main" ]; then
+            deployEnv="production"
+          fi
+          
+          echo "Deploying to ${deployEnv}"
+          echo "##[set-output name=deployEnv;]$(echo ${deployEnv})"
+      
+  deploy:
+    needs: [changes]
+    name: Deploy Parent ${{ needs.changes.outputs.deployEnv }}
+    environment: ${{ needs.changes.outputs.deployEnv }}
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Deploy
+        run: |
+          npm install -g aws-cdk
+          cd infrastructure/lib/lambda
+          npm install
+          cd ../../
+          npm install
+          npm run build
+          STAGE=${{ needs.changes.outputs.deployEnv }} npm run deploy
